@@ -18,7 +18,7 @@
  *   so the entire session freezes with gnome-shell at 100% of a core.
  *
  *   Observed on FuriOS 2026-08-24: Xwayland aborts at startup when it cannot
- *   take the single HWC2 composer client (mutter holds it), and the next focus
+ *   take the single HWC2 composer client(mutter holds it), and the next focus
  *   change locks up the desktop. mutter already falls back to the monotonic
  *   clock when display->x11_display is NULL -- but a *crashed* Xwayland leaves
  *   that pointer non-NULL, so it takes the X path anyway.
@@ -56,26 +56,25 @@
 static int debug_enabled;
 
 /* Same LOG() shape as the other hybris shims. */
-#define LOG(fmt, ...) shim_log ("xifevent-shim: " fmt, ##__VA_ARGS__)
+#define LOG(fmt, ...) shim_log("xifevent-shim: " fmt, ##__VA_ARGS__)
 
-static void __attribute__((format (printf, 1, 2)))
-shim_log (const char *fmt, ...)
-{
+static void __attribute__((format(printf, 1, 2)))
+shim_log(const char *fmt, ...) {
     va_list ap;
 
     if (!debug_enabled)
         return;
 
-    va_start (ap, fmt);
-    vfprintf (stderr, fmt, ap);
-    fputc ('\n', stderr);
-    va_end (ap);
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    fputc('\n', stderr);
+    va_end(ap);
 }
 
 __attribute__((constructor))
-static void shim_init (void)
+static void shim_init(void)
 {
-  debug_enabled = getenv ("XIFEVENT_SHIM_DEBUG") != NULL;
+  debug_enabled = getenv("XIFEVENT_SHIM_DEBUG") != NULL;
 }
 
 /* The session exports LD_PRELOAD to every child, but only the compositor has
@@ -83,9 +82,7 @@ static void shim_init (void)
  * the desktop. An ordinary X client may legitimately wait a long time for an
  * event, and handing it a synthetic one would be wrong -- so everything except
  * the compositor gets the real, unbounded XIfEvent(). */
-static int
-is_compositor (void)
-{
+static int is_compositor(void) {
   static int cached = -1;
   char buf[256] = {0};
   const char *base;
@@ -94,87 +91,83 @@ is_compositor (void)
   if (cached != -1)
     return cached;
 
-  n = readlink ("/proc/self/exe", buf, sizeof (buf) - 1);
+  n = readlink("/proc/self/exe", buf, sizeof (buf) - 1);
   if (n < 0)
     {
       cached = 0;
       return cached;
     }
   buf[n] = '\0';
-  base = strrchr (buf, '/');
+  base = strrchr(buf, '/');
   base = base ? base + 1 : buf;
-  cached = (strcmp (base, "gnome-shell") == 0 ||
-            strcmp (base, "mutter") == 0);
+  cached = (strcmp(base, "gnome-shell") == 0 ||
+            strcmp(base, "mutter") == 0);
   return cached;
 }
 
-static long
-monotonic_ms (void)
-{
+static long monotonic_ms(void) {
   struct timespec ts;
-  clock_gettime (CLOCK_MONOTONIC, &ts);
+  clock_gettime(CLOCK_MONOTONIC, &ts);
   return (long) ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
-int
-XIfEvent (Display *display,
+int XIfEvent(Display *display,
           XEvent  *event_return,
           Bool   (*predicate) (Display *, XEvent *, XPointer),
-          XPointer arg)
-{
-  static int (*real_check) (Display *, XEvent *,
-                            Bool (*) (Display *, XEvent *, XPointer),
+          XPointer arg) {
+  static int(*real_check) (Display *, XEvent *,
+                            Bool(*) (Display *, XEvent *, XPointer),
                             XPointer) = NULL;
   long deadline;
   int fd;
 
   if (!real_check)
-    real_check = dlsym (RTLD_NEXT, "XCheckIfEvent");
+    real_check = dlsym(RTLD_NEXT, "XCheckIfEvent");
 
-  if (!is_compositor ())
+  if (!is_compositor())
     {
-      static int (*passthrough) (Display *, XEvent *,
-                                 Bool (*) (Display *, XEvent *, XPointer),
+      static int(*passthrough) (Display *, XEvent *,
+                                 Bool(*) (Display *, XEvent *, XPointer),
                                  XPointer) = NULL;
       if (!passthrough)
-        passthrough = dlsym (RTLD_NEXT, "XIfEvent");
+        passthrough = dlsym(RTLD_NEXT, "XIfEvent");
       if (passthrough)
-        return passthrough (display, event_return, predicate, arg);
+        return passthrough(display, event_return, predicate, arg);
     }
 
   /* No XCheckIfEvent to build on: fall through to the real blocking call
    * rather than inventing behaviour. */
   if (!real_check)
     {
-      static int (*real_if) (Display *, XEvent *,
-                             Bool (*) (Display *, XEvent *, XPointer),
+      static int(*real_if) (Display *, XEvent *,
+                             Bool(*) (Display *, XEvent *, XPointer),
                              XPointer) = NULL;
       if (!real_if)
-        real_if = dlsym (RTLD_NEXT, "XIfEvent");
+        real_if = dlsym(RTLD_NEXT, "XIfEvent");
       if (!real_if)
         return 0;
-      return real_if (display, event_return, predicate, arg);
+      return real_if(display, event_return, predicate, arg);
     }
 
-  XFlush (display);
-  fd = ConnectionNumber (display);
-  deadline = monotonic_ms () + XIFEVENT_TIMEOUT_MS;
+  XFlush(display);
+  fd = ConnectionNumber(display);
+  deadline = monotonic_ms() + XIFEVENT_TIMEOUT_MS;
 
   for (;;)
     {
       struct pollfd pfd;
       int ret;
 
-      if (real_check (display, event_return, predicate, arg))
+      if (real_check(display, event_return, predicate, arg))
         return 0;
 
-      if (monotonic_ms () >= deadline)
+      if (monotonic_ms() >= deadline)
         break;
 
       pfd.fd = fd;
       pfd.events = POLLIN;
       pfd.revents = 0;
-      ret = poll (&pfd, 1, 50);
+      ret = poll(&pfd, 1, 50);
       if (ret < 0 && errno != EINTR)
         break;
       /* Peer hung up / bad fd: the server is gone, stop waiting immediately. */
@@ -184,12 +177,12 @@ XIfEvent (Display *display,
 
   /* Timed out. Hand back a PropertyNotify carrying a monotonic timestamp --
    * what mutter uses when there is no X11 display at all. */
-  memset (event_return, 0, sizeof (*event_return));
+  memset(event_return, 0, sizeof (*event_return));
   event_return->type = PropertyNotify;
   event_return->xproperty.display = display;
-  event_return->xproperty.time = (unsigned long) monotonic_ms ();
+  event_return->xproperty.time = (unsigned long) monotonic_ms();
 
-  LOG ("XIfEvent timed out after %dms (X server gone?); "
+  LOG("XIfEvent timed out after %dms(X server gone?); "
        "returning synthetic timestamp %lu",
        XIFEVENT_TIMEOUT_MS, event_return->xproperty.time);
 
