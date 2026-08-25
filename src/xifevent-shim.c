@@ -40,6 +40,7 @@
  */
 
 #define _GNU_SOURCE
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,6 +54,23 @@
 #define XIFEVENT_TIMEOUT_MS 500
 
 static int debug_enabled;
+
+/* Same LOG() shape as the other hybris shims. */
+#define LOG(fmt, ...) shim_log ("xifevent-shim: " fmt, ##__VA_ARGS__)
+
+static void __attribute__((format (printf, 1, 2)))
+shim_log (const char *fmt, ...)
+{
+    va_list ap;
+
+    if (!debug_enabled)
+        return;
+
+    va_start (ap, fmt);
+    vfprintf (stderr, fmt, ap);
+    fputc ('\n', stderr);
+    va_end (ap);
+}
 
 __attribute__((constructor))
 static void shim_init (void)
@@ -171,11 +189,9 @@ XIfEvent (Display *display,
   event_return->xproperty.display = display;
   event_return->xproperty.time = (unsigned long) monotonic_ms ();
 
-  if (debug_enabled)
-    fprintf (stderr,
-             "xifevent-shim: XIfEvent timed out after %dms "
-             "(X server gone?); returning synthetic timestamp %lu\n",
-             XIFEVENT_TIMEOUT_MS, event_return->xproperty.time);
+  LOG ("XIfEvent timed out after %dms (X server gone?); "
+       "returning synthetic timestamp %lu",
+       XIFEVENT_TIMEOUT_MS, event_return->xproperty.time);
 
   return 0;
 }
