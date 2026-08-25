@@ -11,14 +11,14 @@
  *   This runs on the compositor's main loop, reached from an ordinary WAYLAND
  *   window focus:
  *       meta_window_wayland_focus()
- *         -> meta_display_set_input_focus(timestamp=0)
+ *         -> meta_display_set_input_focus (timestamp=0)
  *           -> meta_display_timestamp_too_old()
  *             -> meta_display_get_current_time_roundtrip()
  *               -> XIfEvent()            <-- never returns
  *   so the entire session freezes with gnome-shell at 100% of a core.
  *
  *   Observed on FuriOS 2026-08-24: Xwayland aborts at startup when it cannot
- *   take the single HWC2 composer client(mutter holds it), and the next focus
+ *   take the single HWC2 composer client (mutter holds it), and the next focus
  *   change locks up the desktop. mutter already falls back to the monotonic
  *   clock when display->x11_display is NULL -- but a *crashed* Xwayland leaves
  *   that pointer non-NULL, so it takes the X path anyway.
@@ -113,9 +113,9 @@ static long monotonic_ms(void) {
 
 int XIfEvent(Display *display,
           XEvent  *event_return,
-          Bool   (*predicate) (Display *, XEvent *, XPointer),
+          Bool   (*predicate)(Display *, XEvent *, XPointer),
           XPointer arg) {
-  static int(*real_check) (Display *, XEvent *,
+  static int (*real_check)(Display *, XEvent *,
                             Bool(*) (Display *, XEvent *, XPointer),
                             XPointer) = NULL;
   long deadline;
@@ -126,7 +126,7 @@ int XIfEvent(Display *display,
 
   if (!is_compositor())
     {
-      static int(*passthrough) (Display *, XEvent *,
+      static int (*passthrough)(Display *, XEvent *,
                                  Bool(*) (Display *, XEvent *, XPointer),
                                  XPointer) = NULL;
       if (!passthrough)
@@ -139,7 +139,7 @@ int XIfEvent(Display *display,
    * rather than inventing behaviour. */
   if (!real_check)
     {
-      static int(*real_if) (Display *, XEvent *,
+      static int (*real_if)(Display *, XEvent *,
                              Bool(*) (Display *, XEvent *, XPointer),
                              XPointer) = NULL;
       if (!real_if)
